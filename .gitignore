@@ -8,3 +8,33 @@ output.csv
 dist/
 build/
 *.egg-info/
+
+# Environment & secrets
+.env
+.env.*
+*.env
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Test / coverage
+htmlcov/
+.coverage
+coverage.xml
+*.cover
+.tox/

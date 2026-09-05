@@ -63,5 +63,14 @@ def run_simulation(iterations: int = 100):
     print("=" * 70)
 
 if __name__ == "__main__":
-    n = int(sys.argv[1]) if len(sys.argv) > 1 else 100
+    n = 100
+    if len(sys.argv) > 1:
+        try:
+            n = int(sys.argv[1])
+        except (ValueError, TypeError):
+            print(f"Error: iterations must be a positive integer, got '{sys.argv[1]}'", file=sys.stderr)
+            sys.exit(1)
+    if n <= 0:
+        print("Error: iterations must be a positive integer", file=sys.stderr)
+        sys.exit(1)
     run_simulation(n)
