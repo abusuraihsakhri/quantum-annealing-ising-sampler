@@ -59,3 +59,10 @@ def test_batch_false_boolean(tmp_path):
 def test_cli_reports_invalid_schedule(capsys):
     assert main(["sample", "--fields", "[0]", "--reads", "0"]) == 2
     assert "Invalid Ising" in capsys.readouterr().err
+
+
+def test_no_silent_provider_fallback():
+    import pytest
+    from agents.llm_factory import LLMFactory
+    with pytest.raises(ValueError, match="not implemented"):
+        LLMFactory.create("openai")

@@ -22,7 +22,7 @@ def _parse_csv_bool(value):
 
 
 def _safe_resolve_path(path_str: str, must_exist: bool = False) -> Path:
-    """Resolve a user-supplied path safely, preventing directory traversal."""
+    """Resolve a caller-selected local path (this does not sandbox file access)."""
     path = Path(path_str).resolve()
     if must_exist and not path.exists():
         raise FileNotFoundError(f"Input file not found: {path_str}")

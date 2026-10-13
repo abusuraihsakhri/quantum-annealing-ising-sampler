@@ -33,7 +33,7 @@ Homepage = "https://github.com/abusuraihsakhri/quantum-annealing-ising-sampler"
 Repository = "https://github.com/abusuraihsakhri/quantum-annealing-ising-sampler.git"
 
 [tool.setuptools]
-packages = ["agents", "quantum_annealing"]
+packages = ["agents", "quantum_annealing", "web"]
 py-modules = ["cli", "enrichment", "simulator", "quantum_annealing_app"]
 
 [tool.ruff]
@@ -42,3 +42,6 @@ line-length = 120
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F821", "F822", "F823"]
+
+[tool.setuptools.package-data]
+web = ["*.html", "sampler.mjs"]

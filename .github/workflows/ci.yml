@@ -40,3 +40,15 @@ jobs:
           node-version: "22"
       - name: Test browser-side sampler
         run: node --test web/sampler.test.mjs
+      - name: Verify browser assets in wheel
+        run: |
+          python - <<'PY'
+          from glob import glob
+          import zipfile
+          wheels = glob("dist/*.whl")
+          assert len(wheels) == 1, wheels
+          with zipfile.ZipFile(wheels[0]) as wheel:
+              names = set(wheel.namelist())
+          for expected in ("web/index.html", "web/audit.html", "web/sampler.mjs"):
+              assert expected in names, expected
+          PY
