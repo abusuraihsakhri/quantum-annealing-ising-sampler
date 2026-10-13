@@ -1,40 +1,54 @@
-name: Quantum Annealing Ising Sampler CI/CD & Security Verification
+name: Tests and package checks
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [master, main]
   pull_request:
-    branches: [ master, main ]
+    branches: [master, main]
 
 jobs:
-  test-and-audit:
+  test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
-
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install the package and development dependencies
+        run: python -m pip install -e ".[dev]"
+      - name: Dependency validation
+        run: python -m pip check
+      - name: Python syntax
+        run: python -m compileall -q agents quantum_annealing tests cli.py enrichment.py simulator.py
+      - name: Static checks
+        run: ruff check .
+      - name: Tests
+        run: python -m pytest -q
+      - name: Build distribution
+        run: python -m build
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install fastapi uvicorn pydantic pytest
-
-    - name: Run Pytest Suite
-      run: |
-        pytest -v
-
-    - name: Security SAST & Zero-PHI Audit
-      run: |
-        python -c "
-        from agents.base import PHIGuard, AuditLogger
-        import pytest
-        assert AuditLogger.verify_integrity() is True
-        print('Security & Zero-PHI Audit Passed!')
-        "
+  browser-engine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Test browser-side sampler
+        run: node --test web/sampler.test.mjs
+      - name: Verify browser assets in wheel
+        run: |
+          python - <<'PY'
+          from glob import glob
+          import zipfile
+          wheels = glob("dist/*.whl")
+          assert len(wheels) == 1, wheels
+          with zipfile.ZipFile(wheels[0]) as wheel:
+              names = set(wheel.namelist())
+          for expected in ("web/index.html", "web/audit.html", "web/sampler.mjs"):
+              assert expected in names, expected
+          PY
