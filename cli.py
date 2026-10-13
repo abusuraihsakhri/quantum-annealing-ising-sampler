@@ -10,8 +10,18 @@ from pathlib import Path
 from agents.models import SystemTaskPayload
 from agents.supervisor import SystemSupervisor
 from agents.base import AuditLogger
+from quantum_annealing.sampler import sample_ising
 
 supervisor = SystemSupervisor(model_provider="mock")
+
+
+def _parse_csv_bool(value):
+    normalized = str(value if value is not None else "").strip().lower()
+    if normalized in ("true", "1", "yes", "y"):
+        return True
+    if normalized in ("false", "0", "no", "n", ""):
+        return False
+    raise ValueError(f"Invalid CSV boolean: {value!r}")
 
 
 def _safe_resolve_path(path_str: str, must_exist: bool = False) -> Path:
@@ -43,6 +53,16 @@ def main(argv=None):
     p_batch = subparsers.add_parser("batch", help="Batch process CSV records")
     p_batch.add_argument("-i", "--input", required=True)
     p_batch.add_argument("-o", "--output", default="results.csv")
+
+    # Classical Ising sampler (not a quantum simulation)
+    p_sample = subparsers.add_parser("sample", help="Sample a finite Ising model")
+    p_sample.add_argument("--fields", required=True, help="JSON array of local fields")
+    p_sample.add_argument("--couplings", default="{}", help="JSON object of pair couplings")
+    p_sample.add_argument("--reads", type=int, default=32)
+    p_sample.add_argument("--sweeps", type=int, default=200)
+    p_sample.add_argument("--temp-start", type=float, default=5.0)
+    p_sample.add_argument("--temp-end", type=float, default=0.05)
+    p_sample.add_argument("--seed", type=int, default=0)
 
     # Verify Audit
     subparsers.add_parser("verify-audit", help="Verify HMAC audit trail integrity")
@@ -83,11 +103,24 @@ def main(argv=None):
         print(f"\n[Quantum Annealing Ising Sampler Supervisor]:\n{ans}\n")
         return 0
 
+    if args.command == "sample":
+        try:
+            result = sample_ising(
+                json.loads(args.fields), json.loads(args.couplings),
+                num_reads=args.reads, sweeps=args.sweeps,
+                temp_start=args.temp_start, temp_end=args.temp_end, seed=args.seed,
+            )
+        except (ValueError, json.JSONDecodeError) as exc:
+            print(f"Invalid Ising model or schedule: {exc}", file=sys.stderr)
+            return 2
+        print(json.dumps(result, indent=2, allow_nan=False))
+        return 0
+
     if args.command == "verify-audit":
         trail = AuditLogger.get_trail()
         valid = AuditLogger.verify_integrity()
         print(f"Audit Trail Blocks: {len(trail)} | Cryptographic Integrity Verified: {valid}")
-        return 0
+        return 0 if valid else 1
 
     if args.command == "batch":
         in_path = _safe_resolve_path(args.input, must_exist=True)
@@ -97,7 +130,7 @@ def main(argv=None):
             fieldnames = list(reader.fieldnames or [])
             rows = list(reader)
 
-        out_fields = fieldnames + ["overall_urgency", "integrity_status", "total_alerts", "audit_hash"]
+        out_fields = list(dict.fromkeys(fieldnames + ["overall_urgency", "integrity_status", "total_alerts", "audit_hash"]))
         out_rows = []
         for r in rows:
             payload = SystemTaskPayload(
@@ -106,7 +139,7 @@ def main(argv=None):
                 primary_metric=float(r.get("primary_metric", 15.0)),
                 secondary_metric=float(r.get("secondary_metric", 5.0)),
                 status_descriptor=r.get("status_descriptor", "NOMINAL"),
-                is_critical_flag=bool(r.get("is_critical_flag", False)),
+                is_critical_flag=_parse_csv_bool(r.get("is_critical_flag", False)),
             )
             dossier = supervisor.process_task(payload)
             row_dict = dict(r)

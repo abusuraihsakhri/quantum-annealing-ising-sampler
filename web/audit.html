@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Legacy audit | Ising Sampler</title>
+<style>body{font:15px/1.55 system-ui,sans-serif;background:#0b1220;color:#f1f5fc;max-width:850px;margin:20px auto;padding:0 20px}a{color:#83bdff}
+h1{font-size:1.7rem}p{color:#c7d5e8}.layout{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+section{background:#142035;border:1px solid #415775;border-radius:12px;padding:18px}label{display:block;margin:12px 0}
+input:not([type=checkbox]){width:100%;font:inherit;padding:9px;background:#0b1220;color:white;border:1px solid #7086a3;border-radius:6px;box-sizing:border-box}
+button{background:#83bdff;color:#0b1220;border:0;border-radius:7px;padding:11px 14px;font:inherit;font-weight:700;cursor:pointer}
+input:focus,button:focus-visible{outline:3px solid #83bdff;outline-offset:2px}pre{overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
+#status{color:#c7d5e8}@media(max-width:700px){.layout{grid-template-columns:1fr}}</style></head>
+<body>
+<a href="./index.html">← Ising sampler</a>
+<h1>Legacy threshold-audit console</h1>
+<p>This interface requires the local FastAPI backend. It evaluates threshold rules, <strong>not</strong> Ising energy or quantum circuits. A static GitHub Pages site cannot service this API.</p>
+<div class="layout">
+<section><form id="form">
+<label for="task">Task ID<input id="task" value="TASK-01" required></label>
+<label for="target">Target identifier<input id="target" value="TARGET-01" required></label>
+<label for="primary">Primary metric<input type="number" id="primary" value="29.4" step="any" required></label>
+<label for="secondary">Secondary metric<input type="number" id="secondary" value="14.8" step="any" required></label>
+<label for="descriptor">Status descriptor<input id="descriptor" value="DISCORDANT_ANOMALY" required></label>
+<label><input type="checkbox" id="critical"> Critical flag</label>
+<button type="submit" id="submit">Submit audit</button></form></section>
+<section><div id="status" role="status" aria-live="polite">No request submitted.</div><pre id="output"></pre></section>
+</div>
+<script>
+const el = id => document.getElementById(id);
+el("form").addEventListener("submit", async event => {
+ event.preventDefault(); el("submit").disabled = true; el("status").textContent = "Requesting backend…"; el("output").textContent = "";
+ try {
+  const payload = {task_id:el("task").value,target_identifier:el("target").value,
+   primary_metric:Number(el("primary").value),secondary_metric:Number(el("secondary").value),
+   status_descriptor:el("descriptor").value,is_critical_flag:el("critical").checked};
+  if (![payload.primary_metric,payload.secondary_metric].every(Number.isFinite)) throw new Error("Metrics must be finite");
+  const response = await fetch("/api/audit", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+  if (!response.ok) throw new Error("Backend returned HTTP " + response.status);
+  const data = await response.json();
+  el("output").textContent = JSON.stringify(data, null, 2); el("status").textContent = "Backend response received.";
+ } catch (err) {el("status").textContent = "Unable to obtain a real audit result: " + err.message + ". Run the local API server to use this console.";}
+ finally {el("submit").disabled = false;}
+});
+</script></body></html>

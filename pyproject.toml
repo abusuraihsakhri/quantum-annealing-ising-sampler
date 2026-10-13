@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "quantum-annealing-ising-sampler"
 version = "2.0.0"
-description = "D-Wave Style Quantum Annealing & Transverse Field Ising Engine"
+description = "Classical simulated annealing for finite Ising models with browser and API interfaces"
 readme = "README.md"
 authors = [{ name = "Dr. Abu Suraih Sakhri", email = "abusuraih@example.com" }]
 license = { text = "MIT" }
@@ -13,15 +13,32 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
-    "Topic :: Security/Cryptography",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 requires-python = ">=3.9"
-dependencies = []
+dependencies = [
+    "pydantic>=2,<3",
+    "fastapi>=0.110,<1",
+    "uvicorn>=0.27,<1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx>=0.27", "ruff>=0.6", "build>=1"]
 
 [project.scripts]
-quantum-annealing-ising-sampler = "quantum_annealing.cli:main"
+quantum-annealing-ising-sampler = "cli:main"
 
 [project.urls]
 Homepage = "https://github.com/abusuraihsakhri/quantum-annealing-ising-sampler"
 Repository = "https://github.com/abusuraihsakhri/quantum-annealing-ising-sampler.git"
+
+[tool.setuptools]
+packages = ["agents", "quantum_annealing"]
+py-modules = ["cli", "enrichment", "simulator", "quantum_annealing_app"]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F821", "F822", "F823"]

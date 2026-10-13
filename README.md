@@ -1,212 +1,81 @@
 # Quantum Annealing Ising Sampler
 
-> **Domain:** Post-Quantum Cryptography & Zero-Knowledge Architecture
-> **Standards:** NIST FIPS 203/204/205, NIST SP 800-90B & ISO/IEC Standards
+A small, dependency-free **classical simulated-annealing solver** for finite Ising energy models, with a standalone browser interface and Python API/CLI. The repository also retains its original threshold-based audit systems as separate legacy functionality.
 
-<div align="center">
+## What it actually computes
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB.svg?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688.svg?logo=fastapi&logoColor=white)
-![Audit Trail](https://img.shields.io/badge/Audit-HMAC--SHA256_Tamper--Evident-brightgreen.svg)
-![Zero-PHI Guard](https://img.shields.io/badge/Guard-Zero--PHI_Outbound-blue.svg)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)
+For spins sᵢ ∈ {−1,+1}, the energy function is:
 
-</div>
+`E(s) = Σ hᵢsᵢ + Σ Jᵢⱼsᵢsⱼ` (one J entry per unordered pair).
 
----
+The sampler performs independent Metropolis reads with a geometric temperature schedule and reports the final configurations, their energies, counts, and lowest **observed** energy. It is **not** a quantum-annealing, transverse-field Ising, D-Wave hardware, Pegasus embedding, or ground-state certification implementation. No QPU or external API is used.
 
-## Overview
+## Browser app
 
-Quantum Annealing Ising Sampler is a Python platform that combines a multi-agent evaluation engine with a D-Wave-style quantum annealing / transverse-field Ising model (TFIM) simulation framework. It processes task payloads through specialized workers that check protocol conformance, safety boundaries, and specification invariants, then produces a cryptographically signed consensus dossier.
+Serve `web/` with a static HTTP server, for example `python -m http.server 8001 -d web`, and open `http://127.0.0.1:8001/`. Opening the HTML directly via `file://` can block JavaScript module imports. Enter the array of local fields, an object of zero-based pair couplings such as `{"0,1":-1.2}`, and a sampling schedule. Select **Run annealing**. Results can be exported as CSV or JSON. A fixed seed is deterministic within the browser implementation (not necessarily identical to Python's RNG).
 
-The project provides two parallel agent systems:
+The browser runs plain JavaScript locally; Pyodide is not required. It works on static hosts such as GitHub Pages. There is no backend or data upload in the sampler page. The separate `web/audit.html` page requires the locally running FastAPI service for its audit requests; it never fabricates an offline response.
 
-- **`agents/`** — Enterprise supervisor with PHI outbound guard, HMAC-SHA256 audit trail, and FastAPI REST API.
-- **`quantum_annealing/`** — D-Wave-style embedding, annealing schedule, and spin-glass energy agents with QUBO protocol evaluation.
+## Install and use Python
 
----
-
-## Key Capabilities
-
-- **Multi-Agent Evaluation Engine**: Three specialized workers (InvariantQC, SafetyEscalation, ProtocolConformance) evaluate each task payload and produce urgency-classified alerts.
-- **D-Wave-Style Quantum Annealing Agents**: QUBO embedding, annealing schedule, and spin-glass energy agents audit parameters against QUBO protocol bounds.
-- **Zero-PHI Outbound Guard**: Active regex inspection blocking SSNs, MRNs, phone numbers, emails, and patient identifiers from leaving the system.
-- **Tamper-Evident HMAC-SHA256 Audit Trail**: Chained, cryptographically signed logs for every evaluation and state transition.
-- **FastAPI REST API**: OpenAPI endpoints for audit, chat, metrics, and audit log retrieval.
-- **Prometheus Telemetry**: Operational metrics exporter for tasks, alerts, PHI blocks, and audit chain depth.
-- **CLI & Batch Processing**: Command-line interface with single-task, batch CSV, chat, and server subcommands.
-- **Active Learning Bayesian Calibration**: Dynamic worker reliability weight tracker with Brier calibration drift monitoring.
-
----
-
-## Installation
+Requires Python 3.9 or newer.
 
 ```bash
-# Clone the repository
-git clone https://github.com/abusuraihsakhri/quantum-annealing-ising-sampler.git
-cd quantum-annealing-ising-sampler
-
-# Install dependencies
-pip install -e .
-
-# For development (testing + API server)
-pip install -e ".[dev]"
+python -m pip install -e ".[dev]"
+quantum-annealing-ising-sampler sample --fields '[0.25,-0.4,0.1]' --couplings '{"0,1":-1.2,"1,2":0.8}' --reads 60 --sweeps 250 --seed 42
 ```
 
-### Optional Dependencies
+The sampler can also be imported:
 
-The core engine has no required dependencies. For the REST API and testing:
-
-```bash
-pip install fastapi uvicorn pydantic pytest
+```python
+from quantum_annealing.sampler import sample_ising, ising_energy
+result = sample_ising([0, 0], {"0,1": -1}, num_reads=20, seed=7)
+print(result["best_energy"], result["best_spins"])
 ```
 
----
+Inputs are limited to 1–24 spins, 1–200 independent reads, and 1–2000 sweeps/read. Temperatures must satisfy `0 < temp_end <= temp_start`, and coupling keys must identify different spins. Scores are based on the energy convention above, and there is no optimality guarantee.
 
-## Configuration
+## HTTP service
 
-Set the audit secret key for persistent cryptographic integrity across restarts:
-
-```bash
-export AUDIT_SECRET_KEY="your-random-secret-key"
-```
-
-If not set, a random ephemeral key is generated at startup (audit trail will not persist across restarts).
-
----
-
-## CLI Usage
-
-### 1. Single Task Evaluation
-```bash
-python cli.py audit --task-id TASK-001 --target KEY-01 --primary 28.5 --secondary 14.2 --critical --status DISCORDANT
-```
-
-### 2. Supervisory Chat
-```bash
-python cli.py chat "What is the system status?"
-```
-
-### 3. Batch CSV Processing
-```bash
-python cli.py batch -i sample.csv -o results.csv
-```
-
-### 4. Verify Audit Trail Integrity
-```bash
-python cli.py verify-audit
-```
-
-### 5. Launch REST API Server
 ```bash
 python cli.py serve --host 127.0.0.1 --port 8000
 ```
 
-### 6. Run Simulation Benchmark
-```bash
-python simulator.py 1000
-```
+Open `http://127.0.0.1:8000/` for the browser app or send a JSON POST request to `/api/sample` using `fields`, `couplings`, `num_reads`, `sweeps`, `temp_start`, `temp_end`, and `seed`. The endpoint uses the same Python sampler.
 
----
+Existing legacy commands `audit`, `batch`, `chat`, `verify-audit`, and `serve` remain available on the primary CLI. The older `quantum_annealing.cli` module remains available for compatibility. Legacy `agents/api.py` exposes `/api/audit`, `/api/chat`, `/api/audit/logs`, `/health`, and `/metrics`. Its audit conditions are fixed heuristic thresholds, **not** standard-compliant QUBO/quantum verification. The 'mock' chat provider is deterministic and is not an actual LLM service.
 
-## Input Data Schema
+## Security and privacy
 
-| Field | Type | Description | Requirement |
-|:------|:-----|:------------|:------------|
-| `task_id` | str | Unique task / case identifier | Required |
-| `target_identifier` | str | Entity or target key | Required |
-| `primary_metric` | float | Primary domain measurement | Required |
-| `secondary_metric` | float | Secondary kinetic/confidence score | Optional (default 0.0) |
-| `status_descriptor` | str | Status code or phenotype descriptor | Optional (default "NOMINAL") |
-| `is_critical_flag` | bool | Emergency escalation trigger | Optional (default False) |
+The browser sampler performs all calculations and exports locally without transmitting model inputs. The FastAPI backend receives data sent to its endpoints and keeps audit entries in process memory. A regex-based identifier filter is limited and should **not** be treated as a comprehensive de-identification or HIPAA compliance guarantee. HMAC-SHA256 audit entries are linked and reverified in memory; they are not persisted between restarts. Set `AUDIT_SECRET_KEY` to a cryptographically strong private value if using the backend. Do not place secret keys in browser code.
 
----
-
-## REST API Endpoints
-
-| Method | Endpoint | Description |
-|:-------|:---------|:------------|
-| GET | `/health` | Service health check |
-| GET | `/metrics` | Operational metrics |
-| POST | `/api/audit` | Submit task payload for evaluation |
-| POST | `/api/chat` | Query the supervisory chat |
-| GET | `/api/audit/logs` | Retrieve HMAC audit trail |
-
----
-
-## Testing
-
-Run the automated test suite:
+For Docker deployment:
 
 ```bash
-pytest -v
+export AUDIT_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+docker compose up --build
 ```
 
-Execute high-throughput batch simulation benchmarks:
+Do not expose the unauthenticated audit API or logs to untrusted networks.
+
+## Tests
 
 ```bash
-python simulator.py 1000
+python -m pytest -q
+ruff check .
+python -m build
+node --test web/sampler.test.mjs
 ```
 
----
+CI checks Python 3.10–3.12 and Node 22. The project uses Python's standard library for sampling, FastAPI/Pydantic/Uvicorn for the optional server and legacy audit API, and plain JavaScript for the browser.
 
-## Container Deployment
+## Project notes
 
-```bash
-docker build -t quantum-annealing-ising-sampler .
-docker run -p 8000:8000 -e AUDIT_SECRET_KEY=your-secret-key quantum-annealing-ising-sampler
-```
+- `quantum_annealing/sampler.py` — classical Ising sampler.
+- `web/index.html` / `web/sampler.mjs` — standalone browser sampler.
+- `agents/` — retained legacy audit logic and API.
+- `quantum_annealing/agents.py` — retained legacy parameter-auditing agents.
+- `enrichment.py` — generic threshold evaluators, not minor-embedding or quantum simulation.
+- `tests/` — numerical, security, compatibility, and API checks.
 
-Or with Docker Compose:
-
-```bash
-AUDIT_SECRET_KEY=your-secret-key docker compose up
-```
-
----
-
-## Project Structure
-
-```
-quantum-annealing-ising-sampler/
-├── agents/                  # Enterprise supervisor, workers, API, audit trail
-│   ├── api.py               # FastAPI REST server
-│   ├── base.py              # PHI guard, HMAC audit trail, security
-│   ├── models.py            # Pydantic schemas
-│   ├── supervisor.py        # Multi-agent orchestrator
-│   ├── workers.py           # Specialized evaluation workers
-│   ├── llm_factory.py       # LLM provider factory (mock/Ollama/Claude/OpenAI)
-│   ├── metrics.py           # Prometheus telemetry exporter
-│   ├── learning.py          # Bayesian calibration engine
-│   └── streamer.py          # WebSocket telemetry broadcaster
-├── quantum_annealing/       # D-Wave-style quantum annealing agents
-│   ├── agents.py            # QUBO, annealing, spin-glass agents
-│   ├── engine.py            # Core algorithmic engine
-│   ├── models.py            # Data models
-│   ├── cli.py               # CLI for quantum annealing module
-│   └── server.py            # FastAPI server factory
-├── tests/                   # Pytest test suite
-├── web/index.html           # Operations console UI
-├── cli.py                   # Main CLI entry point
-├── simulator.py             # High-throughput simulation benchmark
-├── enrichment.py            # Enrichment feature engines
-├── Dockerfile               # Container build
-└── docker-compose.yml       # Container orchestration
-```
-
----
-
-## Security
-
-- **Zero-PHI Outbound Interceptor**: Active regex inspection blocking SSNs, MRNs, phone numbers, emails, and patient identifiers.
-- **Tamper-Evident HMAC-SHA256 Audit Trail**: Chained, cryptographically signed logs for every evaluation.
-- **Path Traversal Protection**: All CLI file I/O uses safe path resolution.
-- **Input Validation**: Simulator and CLI validate all user inputs before processing.
-- **No Hardcoded Secrets**: Audit key sourced from environment variable; ephemeral key generated if unset.
-
----
-
-## License
-
-MIT License. See [LICENSE](LICENSE) for details.
+Browser compatibility: modern browsers supporting JavaScript modules. License: [MIT](LICENSE).
